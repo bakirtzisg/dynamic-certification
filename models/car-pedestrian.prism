@@ -1,0 +1,45 @@
+mdp
+
+// Number of speed bins
+const int maxSpeed=5;
+const int minSpeed=0;
+
+// Length of street
+const int N=5*maxSpeed;
+
+
+// pedestrian move probability
+const double pL=0.8;
+const double pAppear;
+const double speed_prob=0.2;
+formula p_off = (s_p=0)|(s_p=2);
+formula p_on = (s_p=1);
+formula crash = (s_p=1)& pass_int;
+formula pass_int = s>(N-maxSpeed-v-1)&s<(N-maxSpeed);
+
+module car
+	s : [0..N] init 0;
+	v : [minSpeed..maxSpeed] init maxSpeed-1;
+	move_act: bool init false;
+	[move] move_act & (s!=N) -> 1:(s'=min(s+v,N))&(move_act'=false);
+	[accelerate] (s!=N) & !move_act & v<maxSpeed -> 1-speed_prob:(v'=min(v+1,maxSpeed))&(move_act'=true)+speed_prob:(v'=min(v+2,maxSpeed))&(move_act'=true);
+	[coast] (s!=N) & !move_act -> 1-speed_prob:(v'=v)&(move_act'=true)+speed_prob/2:(v'=max(v-1,minSpeed))&(move_act'=true)+speed_prob/2:(v'=min(v+1,maxSpeed))&(move_act'=true);
+	[decelerate] (s!=N) & !move_act -> 1-speed_prob:(v'=max(v-1,minSpeed))&(move_act'=true)+speed_prob:(v'=max(v-2,minSpeed))&(move_act'=true);
+	[] (s=N) -> true;
+endmodule
+
+
+
+module pedestrian
+	s_p : [0..2] init 0;
+	started: bool init false;
+	[move] !started -> pAppear:(started'=true)+1-pAppear:(started'=started); //placement
+	[move] (s_p=0) & started -> pL:(s_p'=1) + 1-pL:(s_p'=0);
+	[move] (s_p=1) & started -> pL/2:(s_p'=2)+pL/2:(s_p'=0) + 1-pL:(s_p'=1);
+	[move] (s_p=2) & started -> pL:(s_p'=1) + 1-pL:(s_p'=2);
+endmodule
+
+label "Crash" = (crash=true);
+label "Goal" = (s=N);
+
+
