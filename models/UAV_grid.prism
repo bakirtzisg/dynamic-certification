@@ -1,0 +1,106 @@
+mdp
+
+const double p_d;
+const int N=5;
+const double slippery = 0;
+
+const int dxMIN = 0;
+const int dyMIN = 0;
+const int dxMAX = N-1;
+const int dyMAX = N-1;
+const int rXMAX = dxMAX;
+const int rYMAX = dyMAX;
+const int rXMIN = 0;
+const int rYMIN = 0;
+
+const int res1x_MIN = -1;
+const int res1x_MAX = -1;
+const int res1y_MIN = -1;
+const int res1y_MAX = -1;
+
+//const int res1x_MIN = N-2;
+//const int res1x_MAX = N-1;
+//const int res1y_MIN = 0;
+//const int res1y_MAX = 1;
+
+const int res2x_MIN = -1;
+const int res2x_MAX = -1;
+const int res2y_MIN = -1;
+const int res2y_MAX = -1;
+
+//const int res2x_MIN = 1;
+//const int res2x_MAX = 2;
+//const int res2y_MIN = N-2;
+//const int res2y_MAX = N-1;
+
+
+formula res1 = (rx <= res1x_MAX) & (rx >= res1x_MIN) &  (ry <= res1y_MAX) & (ry >= res1y_MIN);
+formula res2 = (rx <= res2x_MAX) & (rx >= res2x_MIN) &  (ry <= res2y_MAX) & (ry >= res2y_MIN);
+
+formula x_left_res = (rx= res1x_MAX+1)| (rx=res2x_MAX+1);
+formula x_right_res = (rx= res1x_MIN-1)| (rx=res2x_MIN-1);
+formula y_up_res = (ry= res1y_MIN-1)| (rx=res2y_MIN-1);
+formula y_down_res = (ry= res1y_MAX+1)| (rx=res2y_MAX+1);
+formula no_res = !(x_left_res | x_right_res | y_up_res | y_down_res);
+
+formula crash =  (dx = rx & dy = ry & d_down);
+formula downed = d_down;
+
+formula done = start & crash;
+formula goal = (dx=dxMAX&dy=dyMAX);
+
+// Switching between UAV and robot's turns
+
+module master
+    start : bool init false;
+    turn : bool init false;
+
+    [placement] !start -> (start'=true);
+    [north] start & !done & turn & !downed  -> (turn'=!turn);
+    [south] start & !done & turn & !downed  -> (turn'=!turn);
+    [east]  start & !done & turn & !downed  -> (turn'=!turn);
+    [west]  start & !done & turn & !downed  -> (turn'=!turn);
+    [downed] start & !done & turn & downed  -> (turn'=!turn);
+    [adv]  start & !done & !turn -> (turn'=!turn);
+endmodule
+
+// UAV's actions
+module drone
+    dx : [dxMIN..dxMAX] init 0;
+    dy : [dyMIN..dyMAX] init 0;
+
+    [west] true -> (1-slippery): (dx'=max(dx-1,dxMIN)) + slippery: (dx'=max(dx,dxMIN));
+    [east] true -> (1-slippery): (dx'=min(dx+1,dxMAX)) + slippery: (dx'=min(dx,dxMAX));
+    [south]  true -> (1-slippery): (dy'=min(dy+1,dyMAX)) + slippery: (dy'=min(dy,dyMAX));
+    [north]  true -> (1-slippery): (dy'=max(dy-1,dyMIN)) + slippery: (dy'=max(dy,dyMIN));
+    [downed] true -> 1:true;
+    [scan] true -> 1:(dx'=dx);
+endmodule
+
+
+// Communciation loss module
+module comm_loss
+   d_down : bool init false;
+   [adv] true -> 1-p_d:true + p_d:(d_down'=true);
+   [adv] !d_down -> 1-p_d:true + p_d:(d_down'=true);
+   [adv] d_down -> 1-p_d:true + p_d:(d_down'=false);
+endmodule
+
+
+// Delivery robot's module
+module robot
+    rx : [rXMIN..rXMAX] init rXMAX-1;
+    ry : [rYMIN..rYMAX] init rYMAX;
+
+    [adv] no_res -> 1/4 : (rx'=max(rx-1,rXMIN)) +  1/4: (rx'=min(rx+1,rXMAX))
+                + 1/4 : (ry'=max(ry-1,rYMIN)) + 1/4 : (ry'=min(ry+1,rYMAX));
+    [adv] x_left_res -> 1/3 : (rx'=min(rx+1,rXMAX)) + 1/3:(ry'=max(ry-1,rYMIN))+1/3:(ry'=min(ry+1,rYMAX));
+    [adv] x_right_res -> 1/3 : (rx'=max(rx-1,rXMIN)) + 1/3:(ry'=max(ry-1,rYMIN))+1/3:(ry'=min(ry+1,rYMAX));
+    [adv] y_up_res -> 1/3 : (rx'=min(rx+1,rXMAX)) + 1/3:(ry'=max(ry-1,rYMIN))+1/3:(rx'=max(rx-1,rXMIN));
+    [adv] y_down_res -> 1/3 : (rx'=min(rx+1,rXMAX)) + 1/3:(ry'=min(ry+1,rYMAX))+1/3:(rx'=max(rx-1,rXMIN));
+endmodule
+
+label "Crash" = (crash=true);
+label "Goal" = (goal=true);
+
+
