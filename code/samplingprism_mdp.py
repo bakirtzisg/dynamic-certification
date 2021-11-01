@@ -12,6 +12,8 @@ import time
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import math
+from stormpy.utility import ShortestPathsGenerator
+import os
 
 # from gurobipy import *
 
@@ -26,12 +28,17 @@ def CDF(x):
 
 #loading model and specs
 def loader():
-    path = "UAV_grid.prism"
+    path = "../models/UAV_grid.prism"
     prism_program = stormpy.parse_prism_program(path)
     print("Building model from {}".format(path))
     formula_str = 'Pmax=? [!"Crash" U "Goal"]'
     properties = stormpy.parse_properties_for_prism_program(formula_str, prism_program)
-    model = stormpy.build_parametric_model(prism_program)
+    options = stormpy.BuilderOptions([properties[0].raw_formula])
+    options.set_build_state_valuations()
+    options.set_build_choice_labels()
+    options.set_build_all_labels()
+    options.set_build_all_reward_models()
+    model = stormpy.build_sparse_parametric_model_with_options(prism_program,options)
 
     print("Model supports parameters: {}".format(model.supports_parameters))
     parameters = model.collect_probability_parameters()
@@ -109,9 +116,46 @@ def run_sample(numiter,numsample,thres,direction,parameters,model,properties):
             time_t1 = time.time()
             result = stormpy.model_checking(instantiated_model, properties[0],extract_scheduler=True)
             print('Synth RT {}'.format(time.time()-time_t1))
+            dtmc = instantiated_model.apply_scheduler(result.scheduler)
             data_out.update({s:result.at(0)})
-    return None,data_out
+        file_loc = os.getcwd() + '/grid.drn'
+        stormpy.export_to_drn(dtmc, file_loc)
+        convert_drn_to_dtmc(file_loc)
+        dtmc = stormpy.build_model_from_drn(file_loc)
+        counter_examples = []
+        spg = ShortestPathsGenerator(dtmc, "Crash")
+        for k in range(1, 6):
+            states = spg.get_path_as_list(k)
+            path_valuations = []
+            for k_i in reversed(states):
+                k_val = dtmc.states[k_i].labels
+                path_valuations.append(convert_labels_to_tuple(k_val))
+            counter_examples.append(path_valuations)
+    return counter_examples,data_out
 
+## Converting the sparse MDP to sparse DTMC for the counterexample paths
+def convert_drn_to_dtmc(file_loc):
+    a_file = open(file_loc,'r')
+    list_of_lines = a_file.readlines()
+    list_of_lines[2] = '@type: DTMC\n'
+    a_file = open(file_loc,'w')
+    a_file.writelines(list_of_lines)
+    a_file.close()
+
+def convert_labels_to_tuple(labels):
+    hold_list = [0,0,0,0,0]
+    for l_i in labels:
+        if re.search('rx',l_i):
+            hold_list[2] = int(re.search(r'\d+', l_i).group())
+        elif re.search('ry',l_i):
+            hold_list[3] = int(re.search(r'\d+', l_i).group())
+        elif re.search('x_',l_i):
+            hold_list[0] = int(re.search(r'\d+', l_i).group())
+        elif re.search('y_',l_i):
+            hold_list[1] = int(re.search(r'\d+', l_i).group())
+        elif re.search('downed',l_i):
+            hold_list[4] = 1
+    return tuple(hold_list)
             # rational_parameters_oc = dict([[parameter_oc, stormpy.RationalRF(s)]])
             # ins_oc = instant_model.instantiate(rational_parameters_oc)
             # result_oc = stormpy.model_checking(ins_oc, prop[0], extract_scheduler=True)
@@ -203,7 +247,7 @@ def compute_avg_satprob(counterarray,N,eps,flag):
 
 parameters,model,properties=loader()
 numiter=1
-numsample=1000
+numsample=100
 threshold=0.75
 direction=True
 counter_array,data_out=run_sample(numiter,numsample,threshold,direction,parameters,model,properties)
@@ -218,8 +262,8 @@ for x in data_out:
     # yline.append(y)
 
 a_li = np.asarray([xline,yline])
-np.savetxt('Grid.csv',a_li.T,delimiter=',')
+np.savetxt('Grid2.csv',a_li.T,delimiter=',')
 ax.scatter(xline,yline)
 ax.set_xlabel(r'$p_1$')
 ax.set_ylabel(r'$Pr_{max}[\neg Crash~{\sf U}~Goal]$')
-plt.savefig('Grid.png')
+plt.savefig('Grid2.png')

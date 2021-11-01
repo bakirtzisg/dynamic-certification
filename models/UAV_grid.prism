@@ -13,25 +13,25 @@ const int rYMAX = dyMAX;
 const int rXMIN = 0;
 const int rYMIN = 0;
 
-const int res1x_MIN = -1;
-const int res1x_MAX = -1;
-const int res1y_MIN = -1;
-const int res1y_MAX = -1;
+//const int res1x_MIN = -1;
+//const int res1x_MAX = -1;
+//const int res1y_MIN = -1;
+//const int res1y_MAX = -1;
 
-//const int res1x_MIN = N-2;
-//const int res1x_MAX = N-1;
-//const int res1y_MIN = 0;
-//const int res1y_MAX = 1;
+const int res1x_MIN = N-2;
+const int res1x_MAX = N-1;
+const int res1y_MIN = 0;
+const int res1y_MAX = 1;
 
-const int res2x_MIN = -1;
-const int res2x_MAX = -1;
-const int res2y_MIN = -1;
-const int res2y_MAX = -1;
+//const int res2x_MIN = -1;
+//const int res2x_MAX = -1;
+//const int res2y_MIN = -1;
+//const int res2y_MAX = -1;
 
-//const int res2x_MIN = 1;
-//const int res2x_MAX = 2;
-//const int res2y_MIN = N-2;
-//const int res2y_MAX = N-1;
+const int res2x_MIN = N-2;
+const int res2x_MAX = N-1;
+const int res2y_MIN = N-2;
+const int res2y_MAX = N-1;
 
 
 formula res1 = (rx <= res1x_MAX) & (rx >= res1x_MIN) &  (ry <= res1y_MAX) & (ry >= res1y_MIN);
@@ -47,7 +47,7 @@ formula crash =  (dx = rx & dy = ry & d_down);
 formula downed = d_down;
 
 formula done = start & crash;
-formula goal = (dx=dxMAX&dy=dyMAX);
+formula goal = (dx=dxMAX&dy=dyMIN);
 
 // Switching between UAV and robot's turns
 
@@ -66,8 +66,8 @@ endmodule
 
 // UAV's actions
 module drone
-    dx : [dxMIN..dxMAX] init 0;
-    dy : [dyMIN..dyMAX] init 0;
+    dx : [dxMIN..dxMAX] init dxMAX;
+    dy : [dyMIN..dyMAX] init dyMAX;
 
     [west] true -> (1-slippery): (dx'=max(dx-1,dxMIN)) + slippery: (dx'=max(dx,dxMIN));
     [east] true -> (1-slippery): (dx'=min(dx+1,dxMAX)) + slippery: (dx'=min(dx,dxMAX));
@@ -89,8 +89,8 @@ endmodule
 
 // Delivery robot's module
 module robot
-    rx : [rXMIN..rXMAX] init rXMAX-1;
-    ry : [rYMIN..rYMAX] init rYMAX;
+    rx : [rXMIN..rXMAX] init 2;
+    ry : [rYMIN..rYMAX] init 1;
 
     [adv] no_res -> 1/4 : (rx'=max(rx-1,rXMIN)) +  1/4: (rx'=min(rx+1,rXMAX))
                 + 1/4 : (ry'=max(ry-1,rYMIN)) + 1/4 : (ry'=min(ry+1,rYMAX));
@@ -102,5 +102,25 @@ endmodule
 
 label "Crash" = (crash=true);
 label "Goal" = (goal=true);
-
+label "x_0" = (dx=0);
+label "x_1" = (dx=1);
+label "x_2" = (dx=2);
+label "x_3" = (dx=3);
+label "x_4" = (dx=4);
+label "y_0" = (dy=0);
+label "y_1" = (dy=1);
+label "y_2" = (dy=2);
+label "y_3" = (dy=3);
+label "y_4" = (dy=4);
+label "rx0" = (rx=0);
+label "rx1" = (rx=1);
+label "rx2" = (rx=2);
+label "rx3" = (rx=3);
+label "rx4" = (rx=4);
+label "ry0" = (ry=0);
+label "ry1" = (ry=1);
+label "ry2" = (ry=2);
+label "ry3" = (ry=3);
+label "ry4" = (ry=4);
+label "downed" = (d_down=true);
 
